@@ -34,7 +34,7 @@ export const getPlaylistItems = async (req: Request, res: Response): Promise<voi
 export const addPlaylistItem = async (req: Request, res: Response): Promise<void> => {
   try {
     const { videoId } = req.body;
-    const playlistId = req.params.id;
+    const playlistId = req.params.id as string;
 
     // Get max order
     const lastItem = await PlaylistItem.findOne({ playlistId }).sort({ order: -1 });

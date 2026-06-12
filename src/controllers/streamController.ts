@@ -41,7 +41,7 @@ export const deleteStreamInstance = async (req: Request, res: Response): Promise
 
 export const startStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     await ffmpegService.startStream(id);
     res.json({ message: 'Stream started' });
   } catch (error: any) {
@@ -51,7 +51,7 @@ export const startStream = async (req: Request, res: Response): Promise<void> =>
 
 export const stopStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     await ffmpegService.stopStream(id);
     res.json({ message: 'Stream stopped' });
   } catch (error: any) {
