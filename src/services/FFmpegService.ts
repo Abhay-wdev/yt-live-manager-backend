@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
-import { StreamInstance, StreamState, StreamLog, YoutubeAccount } from '../models/Stream';
+import { StreamInstance, StreamState, StreamLog } from '../models/Stream';
+import { YoutubeAccount } from '../models/YoutubeAccount';
 import { PlaylistItem } from '../models/Playlist';
 import { io } from '../app';
 import axios from 'axios';

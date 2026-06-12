@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { YoutubeAccount } from '../models/Stream'; // Assuming it's exported there, wait I created it in YoutubeAccount.ts
+import { YoutubeAccount } from '../models/YoutubeAccount'; // Assuming it's exported there, wait I created it in YoutubeAccount.ts
 
 export const getAccounts = async (req: Request, res: Response) => {
   try {
