@@ -91,6 +91,17 @@ export class FFmpegService {
     try {
         const response = await axios.get(initialUrl, { responseType: 'text', withCredentials: true, maxRedirects: 5 });
         const html = response.data;
+        
+        const uuidMatch = html.match(/name="uuid"\s+value="([^"]+)"/i);
+        if (uuidMatch) {
+            const uuid = uuidMatch[1];
+            let cookie = '';
+            if (response.headers['set-cookie']) {
+                cookie = response.headers['set-cookie'].map((c: string) => c.split(';')[0]).join('; ');
+            }
+            return { url: `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t&uuid=${uuid}`, cookie: cookie };
+        }
+
         const confirmMatch = html.match(/confirm=([a-zA-Z0-9_-]+)/);
         if (confirmMatch) {
             const confirmToken = confirmMatch[1];
