@@ -145,7 +145,15 @@ export class FFmpegService {
 
     ffmpegArgs.push(
       '-i', inputPath,
-      '-c:v', 'copy',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',
+      '-tune', 'zerolatency',
+      '-r', '30',
+      '-g', '60',
+      '-keyint_min', '30',
+      '-maxrate', '2500k',
+      '-bufsize', '5000k',
+      '-pix_fmt', 'yuv420p',
       '-c:a', 'aac',
       '-b:a', '128k',
       '-ar', '44100',
