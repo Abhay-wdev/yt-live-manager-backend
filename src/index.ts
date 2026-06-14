@@ -1,6 +1,9 @@
 import { app, httpServer, io } from './app';
 import { config } from './config/env';
 import { connectDB } from './config/db';
+import './models/YoutubeAccount';
+import './models/Playlist';
+import './models/Stream';
 import './services/ScheduleService'; // Initialize scheduler
 import './services/HealthMonitorService'; // Initialize health monitor
 import { ffmpegService } from './services/FFmpegService';
