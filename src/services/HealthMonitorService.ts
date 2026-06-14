@@ -34,8 +34,8 @@ class HealthMonitorService {
     const cpu = await si.currentLoad();
     const mem = await si.mem();
     
-    const cpuUsage = Math.round(cpu.currentLoad);
-    const memUsage = Math.round((mem.active / mem.total) * 100);
+    const cpuUsage = isNaN(Math.round(cpu.currentLoad)) ? 0 : Math.round(cpu.currentLoad);
+    const memUsage = isNaN(Math.round((mem.active / mem.total) * 100)) ? 0 : Math.round((mem.active / mem.total) * 100);
 
     const cpuHealth = cpuUsage > 90 ? 'Above 90%' : cpuUsage > 70 ? '70–90%' : 'Below 70%';
     const memHealth = memUsage > 90 ? 'Above 90%' : memUsage > 70 ? '70–90%' : 'Below 70%';
