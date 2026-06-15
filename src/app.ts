@@ -14,6 +14,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -46,6 +47,11 @@ app.use('/api/youtube-accounts', youtubeAccountRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// React Router fallback
+app.get('*', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 
 export { app, httpServer, io };
