@@ -34,6 +34,18 @@ const startServer = async () => {
       tunnel.on('close', () => {
         console.log('Tunnel was closed.');
       });
+
+      // Cleanly close tunnel on exit to prevent "zombie" connections that steal the URL
+      const shutdown = () => {
+        console.log('\nClosing tunnel and shutting down...');
+        tunnel.close();
+        process.exit(0);
+      };
+
+      process.on('SIGINT', shutdown);
+      process.on('SIGTERM', shutdown);
+      process.on('SIGUSR2', shutdown); // For nodemon restarts
+
     } catch (err) {
       console.error('Failed to start localtunnel:', err);
     }
