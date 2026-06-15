@@ -19,8 +19,8 @@ export const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (ext !== '.mp4' && ext !== '.mkv' && ext !== '.avi' && ext !== '.mov') {
-      return cb(new Error('Only videos are allowed'));
+    if (ext !== '.mp4' && ext !== '.mkv' && ext !== '.avi' && ext !== '.mov' && ext !== '.webm') {
+      return cb(new Error('Only video files (mp4, mkv, avi, mov, webm) are allowed'));
     }
     cb(null, true);
   },
