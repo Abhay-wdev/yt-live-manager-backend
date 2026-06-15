@@ -173,9 +173,7 @@ export class FFmpegService {
     process.stderr?.on('data', async (data) => {
       const msg = data.toString();
       
-      if (Math.random() < 0.1 || msg.includes('error')) {
-        io.emit('ffmpeg-log', { streamId, log: msg });
-      }
+      io.emit('ffmpeg-log', { streamId, log: msg });
 
       // Parse Health Metrics
       // Example: frame=  100 fps= 30 q=28.0 size= 2048kB time=00:00:03.33 bitrate=5032.5kbits/s drop= 5 speed= 1x
