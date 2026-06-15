@@ -50,7 +50,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // React Router fallback
-app.get('*', (req, res) => {
+app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 
