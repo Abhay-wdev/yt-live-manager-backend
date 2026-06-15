@@ -26,7 +26,7 @@ const startServer = async () => {
     ffmpegService.resumeStateOnBoot();
     
     try {
-      const tunnel = await localtunnel({ port: config.port, subdomain: 'yt-manager-abhay-2026' });
+      const tunnel = await localtunnel({ port: Number(config.port), subdomain: 'yt-manager-abhay-2026' });
       console.log(`\n======================================================`);
       console.log(`\x1b[32mPERMANENT TUNNEL URL: ${tunnel.url}\x1b[0m`);
       console.log(`======================================================\n`);
