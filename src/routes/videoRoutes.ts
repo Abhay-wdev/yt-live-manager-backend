@@ -4,9 +4,7 @@ import { protect } from '../middlewares/authMiddleware';
 import { upload } from '../middlewares/uploadMiddleware';
 import fs from 'fs';
 
-import path from 'path';
-
-const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+const uploadDir = 'uploads/';
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

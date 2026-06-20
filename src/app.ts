@@ -13,8 +13,7 @@ app.use(cors({
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Bypass-Tunnel-Reminder']
 }));
 app.use(express.json());
-const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
-app.use('/uploads', express.static(uploadDir));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use(express.static(path.join(process.cwd(), 'public')));
 
 const httpServer = createServer(app);

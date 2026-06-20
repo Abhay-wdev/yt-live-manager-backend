@@ -8,7 +8,7 @@ import './services/ScheduleService'; // Initialize scheduler
 import './services/HealthMonitorService'; // Initialize health monitor
 import { ffmpegService } from './services/FFmpegService';
 
-import ngrok from '@ngrok/ngrok';
+import localtunnel from 'localtunnel';
 
 const startServer = async () => {
   await connectDB();
@@ -26,25 +26,19 @@ const startServer = async () => {
     ffmpegService.resumeStateOnBoot();
     
     try {
-      const authtoken = process.env.NGROK_AUTHTOKEN;
-      if (!authtoken) {
-        console.error('ERROR: NGROK_AUTHTOKEN is missing in your .env file!');
-        return;
-      }
-
-      const listener = await ngrok.forward({ 
-        addr: Number(config.port), 
-        authtoken: authtoken 
-      });
-      
+      const tunnel = await localtunnel({ port: Number(config.port), subdomain: 'yt-manager-abhay-2026' });
       console.log(`\n======================================================`);
-      console.log(`\x1b[32mPERMANENT TUNNEL URL: ${listener.url()}\x1b[0m`);
+      console.log(`\x1b[32mPERMANENT TUNNEL URL: ${tunnel.url}\x1b[0m`);
       console.log(`======================================================\n`);
+      
+      tunnel.on('close', () => {
+        console.log('Tunnel was closed.');
+      });
 
-      // Cleanly close tunnel on exit
-      const shutdown = async () => {
-        console.log('\nClosing ngrok tunnel and shutting down...');
-        await ngrok.disconnect();
+      // Cleanly close tunnel on exit to prevent "zombie" connections that steal the URL
+      const shutdown = () => {
+        console.log('\nClosing tunnel and shutting down...');
+        tunnel.close();
         process.exit(0);
       };
 
@@ -53,7 +47,7 @@ const startServer = async () => {
       process.on('SIGUSR2', shutdown); // For nodemon restarts
 
     } catch (err) {
-      console.error('Failed to start ngrok:', err);
+      console.error('Failed to start localtunnel:', err);
     }
   });
 };
