@@ -32,6 +32,7 @@ app.use((req, res, next) => {
 });
 
 import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 import videoRoutes from './routes/videoRoutes';
 import playlistRoutes from './routes/playlistRoutes';
 import streamRoutes from './routes/streamRoutes';
@@ -39,6 +40,7 @@ import scheduleRoutes from './routes/scheduleRoutes';
 import youtubeAccountRoutes from './routes/youtubeAccountRoutes';
 
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/stream', streamRoutes);
