@@ -51,6 +51,47 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+app.get('/g-records', (req, res) => {
+  res.send(`
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <title>G Records</title>
+        <style>
+          body {
+            background-color: #0f172a;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+          }
+          h1 {
+            font-size: 3rem;
+            font-weight: bold;
+          }
+          a {
+            color: #818cf8;
+            margin-top: 1rem;
+            text-decoration: none;
+          }
+          a:hover {
+            text-decoration: underline;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>welcome R zone</h1>
+        <a href="/">← Back to Dashboard</a>
+      </body>
+    </html>
+  `);
+});
+
 // React Router fallback
 app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(process.cwd(), 'public', 'index.html'));

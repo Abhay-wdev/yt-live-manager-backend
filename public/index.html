@@ -10,5 +10,40 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Backend injection: Dynamically adding "G records" tab below Playlists
+      setInterval(() => {
+        const links = document.querySelectorAll('a');
+        let playlistLink = null;
+        for (const link of links) {
+          if (link.textContent.trim().includes('Playlists')) {
+            playlistLink = link;
+            break;
+          }
+        }
+        
+        if (playlistLink && !document.getElementById('injected-g-records')) {
+          const newLink = playlistLink.cloneNode(true);
+          newLink.id = 'injected-g-records';
+          newLink.href = '/g-records';
+          
+          // Find text span and change it
+          const textNodes = Array.from(newLink.childNodes).filter(node => node.nodeType === 3 || (node.tagName && !node.querySelector('svg')));
+          const targetNode = newLink.querySelector('span') || newLink;
+          if (targetNode) {
+            targetNode.textContent = 'G records';
+          }
+          
+          // Override React router to force full page load
+          newLink.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.location.href = '/g-records';
+          };
+          
+          playlistLink.parentNode.insertBefore(newLink, playlistLink.nextSibling);
+        }
+      }, 1000);
+    </script>
   </body>
 </html>
