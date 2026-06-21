@@ -2,8 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-
 import path from 'path';
+import SnakeAutoGeneratorService from './services/SnakeAutoGeneratorService';
+import SnakeRecording from './models/SnakeRecording';
+import socketService from './services/socketService';
+import fs from 'fs';
 
 const app = express();
 
@@ -24,6 +27,8 @@ const io = new Server(httpServer, {
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Bypass-Tunnel-Reminder']
   }
 });
+
+socketService.init(io);
 
 // Pass io to request object for use in controllers
 app.use((req, res, next) => {
@@ -51,45 +56,70 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Serve recordings
+app.use('/recordings', express.static(path.join(process.cwd(), 'recordings')));
+
+// --- SNAKE GENERATOR API ---
+app.post('/api/snake-generator/start', async (req, res) => {
+  await SnakeAutoGeneratorService.startJob(req.body.count || 1);
+  res.json({ success: true });
+});
+
+app.post('/api/snake-generator/stop', (req, res) => {
+  SnakeAutoGeneratorService.stopGenerator();
+  res.json({ success: true });
+});
+
+app.post('/api/snake-generator/pause', (req, res) => {
+  SnakeAutoGeneratorService.pauseGenerator();
+  res.json({ success: true });
+});
+
+app.post('/api/snake-generator/resume', (req, res) => {
+  SnakeAutoGeneratorService.resumeGenerator();
+  res.json({ success: true });
+});
+
+app.post('/api/snake-generator/settings', async (req, res) => {
+  const GeneratorSettings = require('./models/GeneratorSettings').default;
+  let settings = await GeneratorSettings.findOne();
+  if (!settings) settings = new GeneratorSettings();
+  Object.assign(settings, req.body);
+  await settings.save();
+  res.json({ success: true });
+});
+
+app.get('/api/snake-recordings', async (req, res) => {
+  try {
+    const recordings = await SnakeRecording.find().sort({ createdAt: -1 });
+    res.json(recordings);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch recordings' });
+  }
+});
+
+app.delete('/api/snake-recordings/:id', async (req, res) => {
+  try {
+    const recording = await SnakeRecording.findById(req.params.id);
+    if (!recording) return res.status(404).json({ error: 'Not found' });
+    
+    if (fs.existsSync(recording.filepath)) {
+      fs.unlinkSync(recording.filepath);
+    }
+    await recording.deleteOne();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete' });
+  }
+});
+
 app.get('/g-records', (req, res) => {
-  res.send(`
-    <!doctype html>
-    <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <title>G Records</title>
-        <style>
-          body {
-            background-color: #0f172a;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            font-family: ui-sans-serif, system-ui, sans-serif;
-          }
-          h1 {
-            font-size: 3rem;
-            font-weight: bold;
-          }
-          a {
-            color: #818cf8;
-            margin-top: 1rem;
-            text-decoration: none;
-          }
-          a:hover {
-            text-decoration: underline;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>welcome R zone</h1>
-        <a href="/">← Back to Dashboard</a>
-      </body>
-    </html>
-  `);
+  const htmlPath = path.join(process.cwd(), 'src', 'views', 'g-records.html');
+  if (fs.existsSync(htmlPath)) {
+    res.sendFile(htmlPath);
+  } else {
+    res.status(404).send('Dashboard UI not found');
+  }
 });
 
 // React Router fallback
