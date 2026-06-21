@@ -89,8 +89,11 @@ class HealthMonitorService {
          console.log(`[Health Monitor] Stream ${streamId} critical health. Forcing restart.`);
          ffmpegService.stopStream(streamId, false).then(() => {
            // Provide a slight delay before triggering recovery 
-           // Usually stopping gracefully handles it, but we can explicitly restart
-           // if ffmpegService doesn't loop it
+           setTimeout(() => {
+             ffmpegService.startStream(streamId, true).catch(err => {
+               console.error(`[Health Monitor] Failed to auto-recover stream ${streamId}:`, err);
+             });
+           }, 3000);
          });
       }
 

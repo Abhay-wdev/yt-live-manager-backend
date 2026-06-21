@@ -28,8 +28,7 @@ export class ScheduleService {
               console.log(`Starting scheduled stream for instance ${instance.name}`);
               try {
                 await ffmpegService.startStream(instance._id.toString());
-                schedule.enabled = false;
-                await schedule.save();
+                // Removed schedule.enabled = false to keep it active for end time
               } catch (e: any) {
                 console.error(`Failed to start scheduled stream: ${e.message}`);
               }
@@ -41,6 +40,11 @@ export class ScheduleService {
           if (now >= schedule.endTime && now <= new Date(schedule.endTime.getTime() + 60000)) {
             console.log(`Stopping scheduled stream for instance ${schedule.streamInstanceId}`);
             await ffmpegService.stopStream(schedule.streamInstanceId.toString());
+            
+            if (schedule.scheduleType === 'one-time') {
+              schedule.enabled = false;
+              await schedule.save();
+            }
           }
         }
       }

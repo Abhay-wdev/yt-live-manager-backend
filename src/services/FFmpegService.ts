@@ -227,6 +227,7 @@ export class FFmpegService {
             io.emit('stream-status', { streamId, status: 'Restarting' });
             
             setTimeout(() => {
+              if (this.intentionalStops.get(streamId)) return;
               if (instance.resumeMode === 'skip-video') {
                 currentActive.playlistIndex++;
                 currentActive.currentVideoLoopCount = 0;
@@ -262,6 +263,13 @@ export class FFmpegService {
       process.kill('SIGKILL');
       this.processes.delete(streamInstanceId);
     }
+    
+    this.lastDbSaveTime.delete(streamInstanceId);
+    
+    // Clean up intentionalStops after a safe delay to ensure all async handlers catch the flag
+    setTimeout(() => {
+      this.intentionalStops.delete(streamInstanceId);
+    }, 15000);
     
     await StreamState.findOneAndUpdate({ streamInstanceId }, { 
       status: 'Offline', 
