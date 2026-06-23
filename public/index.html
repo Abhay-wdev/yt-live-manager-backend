@@ -5,45 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
-    <script type="module" crossorigin src="/assets/index-CPydLSbX.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BtPTskuB.css">
+    <script type="module" crossorigin src="/assets/index-C327ttC0.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DNVnqS7d.css">
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // Backend injection: Dynamically adding "G records" tab below Playlists
-      setInterval(() => {
-        const links = document.querySelectorAll('a');
-        let playlistLink = null;
-        for (const link of links) {
-          if (link.textContent.trim().includes('Playlists')) {
-            playlistLink = link;
-            break;
-          }
-        }
-        
-        if (playlistLink && !document.getElementById('injected-g-records')) {
-          const newLink = playlistLink.cloneNode(true);
-          newLink.id = 'injected-g-records';
-          newLink.href = '/g-records';
-          
-          // Find text span and change it
-          const textNodes = Array.from(newLink.childNodes).filter(node => node.nodeType === 3 || (node.tagName && !node.querySelector('svg')));
-          const targetNode = newLink.querySelector('span') || newLink;
-          if (targetNode) {
-            targetNode.textContent = 'G records';
-          }
-          
-          // Override React router to force full page load
-          newLink.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            window.location.href = '/g-records';
-          };
-          
-          playlistLink.parentNode.insertBefore(newLink, playlistLink.nextSibling);
-        }
-      }, 1000);
-    </script>
   </body>
 </html>

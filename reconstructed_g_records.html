@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>G Records - Video Generation Control Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { background-color: #0f172a; color: white; font-family: ui-sans-serif, system-ui, sans-serif; }
+    canvas { background-color: #000; border: 2px solid #334155; border-radius: 8px; width: 100%; aspect-ratio: 9/16; object-fit: contain; }
+  </style>
+</head>
+<body class="p-6">
+  <div class="max-w-7xl mx-auto space-y-6">
+    <a href="/" class="text-slate-400 hover:text-white mb-4 block">&larr; Back to Dashboard</a>
+    
+    <header class="border-b border-slate-700 pb-4 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold">Video Generation Control Center</h1>
+        <p class="text-slate-400 mt-1">Live monitoring, scheduling, and automation for Snake Shorts.</p>
+      </div>
+      <div class="space-x-2">
+        <button id="btnEmergencyStop" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-bold">EMERGENCY STOP</button>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- LEFT COL: Live Preview -->
+      <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
+        <h2 class="text-xl font-semibold mb-4">Live Game Auto-Player</h2>
+        <canvas id="liveCanvas" width="540" height="960"></canvas>
+        <div class="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <div class="bg-slate-900 p-2 rounded">Score: <span id="lblScore" class="font-bold text-green-400">0</span></div>
+          <div class="bg-slate-900 p-2 rounded">Status: <span id="lblStatus" class="font-bold text-purple-400">Idle</span></div>
+        </div>
+      </div>
+
+      <!-- RIGHT COL: Controls & Queue -->
+      <div class="space-y-6">
+        <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
+          <h2 class="text-xl font-semibold mb-4">Recording Controls</h2>
+          <div class="flex flex-col gap-4">
+            <button onclick="startJob(1)" class="bg-green-600 hover:bg-green-700 text-white p-4 rounded text-xl font-bold">Start Recording 1 MP4</button>
+            <button onclick="startJob(-1)" class="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded text-xl font-bold">Auto Record Infinite MP4s</button>
+            <button id="btnEmergencyStop" class="bg-red-600 hover:bg-red-700 text-white p-2 rounded font-bold mt-4">Stop Generator</button>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 p-4 rounded-lg border border-slate-700">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">Active Jobs</h2>
+            <button onclick="clearQueue()" class="text-red-400 text-sm hover:text-red-300">Clear</button>
+          </div>
+          <div id="queueList" class="space-y-2 text-sm max-h-[200px] overflow-y-auto pr-2">
+            <!-- Queue items -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video Library -->
+    <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 mt-6">
+      <h2 class="text-xl font-semibold mb-4">Generated Library</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="gallery">
+        <!-- Videos -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Dynamically connect to the backend port since React dev server may block WS proxying
+    const backendUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+    const socket = io(backendUrl);
+    const canvas = document.getElementById('liveCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Telemetry Listeners
+    socket.on('snake-frame', (data) => {
+      // data: { snake: [], apple: {}, score, size, res }
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      const resWidth = parseInt(data.res.split('x')[0]);
+      const resHeight = parseInt(data.res.split('x')[1]);
+      canvas.width = resWidth;
+      canvas.height = resHeight;
+
+      const cellSize = data.size;
+      
+      // Draw Apple
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(data.apple.x, data.apple.y, cellSize - 1, cellSize - 1);
+      
+      // Draw Snake
+      ctx.fillStyle = '#22c55e';
+      data.snake.forEach(segment => {
+        ctx.fillRect(segment.x, segment.y, cellSize - 1, cellSize - 1);
+      });
+
+      document.getElementById('lblScore').innerText = data.score;
+      document.getElementById('lblRes').innerText = data.res;
+    });
+
+    socket.on('system-stats', (stats) => {
+      document.getElementById('lblCpu').innerText = stats.cpu + '%';
+      document.getElementById('barCpu').style.width = stats.cpu + '%';
+      document.getElementById('lblRam').innerText = stats.ram + '%';
+      document.getElementById('barRam').style.width = stats.ram + '%';
+    });
+
+    socket.on('generator-status', (status) => {
+      document.getElementById('lblStatus').innerText = status.state;
+      renderQueue(status.jobs);
+    });
+
+    async function startJob(count) {
+      await fetch('/api/snake-generator/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count })
+      });
+    }
+
+    document.getElementById('btnEmergencyStop').addEventListener('click', () => {
+      fetch('/api/snake-generator/stop', { method: 'POST' });
+    });
+
+    function renderQueue(jobs) {
+      const q = document.getElementById('queueList');
+      q.innerHTML = jobs.length === 0 ? '<div class="text-slate-500">No active jobs.</div>' : '';
+      jobs.forEach(j => {
+        q.innerHTML += \`
+          <div class="bg-slate-900 p-2 rounded flex justify-between">
+            <span>\${j.isInfinite ? 'Infinite Mode' : j.targetCount + ' Videos'}</span>
+            <span class="text-\${j.status === 'running' ? 'green' : 'yellow'}-400">\${j.completedCount}/\${j.isInfinite ? '&infin;' : j.targetCount} (\${j.status})</span>
+          </div>
+        \`;
+      });
+    }
+
+    // Refresh Gallery
+    async function fetchGallery() {
+      const res = await fetch('/api/snake-recordings');
+      const data = await res.json();
+      const g = document.getElementById('gallery');
+      g.innerHTML = '';
+      data.forEach(r => {
+        g.innerHTML += \`
+          <div class="bg-slate-900 p-2 rounded">
+            \${r.status === 'completed' 
+              ? \`<video src="/recordings/snake/\${r.filename}" controls class="w-full aspect-[9/16] bg-black mb-2 rounded"></video>\` 
+              : \`<div class="w-full aspect-[9/16] bg-slate-800 flex items-center justify-center mb-2 rounded">Processing</div>\`}
+            <div class="text-xs text-slate-400 break-words">\${r.filename}</div>
+          </div>
+        \`;
+      });
+    }
+    fetchGallery();
+    setInterval(fetchGallery, 5000);
+  </script>
+</body>
+</html>

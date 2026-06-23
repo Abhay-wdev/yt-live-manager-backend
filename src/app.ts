@@ -3,10 +3,10 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
-import SnakeAutoGeneratorService from './services/SnakeAutoGeneratorService';
-import SnakeRecording from './models/SnakeRecording';
 import socketService from './services/socketService';
 import fs from 'fs';
+import multer from 'multer';
+import ffmpeg from 'fluent-ffmpeg';
 
 const app = express();
 
@@ -56,60 +56,87 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// --- RECORDING STUDIO API ---
+
+// Ensure recordings dir exists
+const recordingsDir = path.join(process.cwd(), 'recordings');
+if (!fs.existsSync(recordingsDir)) fs.mkdirSync(recordingsDir);
+
 // Serve recordings
-app.use('/recordings', express.static(path.join(process.cwd(), 'recordings')));
+app.use('/recordings', express.static(recordingsDir));
 
-// --- SNAKE GENERATOR API ---
-app.post('/api/snake-generator/start', async (req, res) => {
-  await SnakeAutoGeneratorService.startJob(req.body.count || 1);
-  res.json({ success: true });
+const upload = multer({ dest: 'temp_uploads/' });
+
+app.post('/api/recordings/upload', upload.single('video'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No video uploaded' });
+  }
+
+  const score = req.body.score || 0;
+  const tempPath = req.file.path;
+  const filename = `space_shooter_${Date.now()}_score${score}.mp4`;
+  const finalPath = path.join(recordingsDir, filename);
+
+  // Convert WebM to MP4 using FFmpeg
+  ffmpeg(tempPath)
+    .outputOptions([
+      '-c:v libx264',
+      '-preset fast',
+      '-crf 23',
+      '-pix_fmt yuv420p'
+    ])
+    .on('end', () => {
+      fs.unlinkSync(tempPath); // Clean up temp file
+      res.json({ success: true, file: filename });
+    })
+    .on('error', (err) => {
+      console.error('FFmpeg error:', err);
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      res.status(500).json({ error: 'Conversion failed' });
+    })
+    .save(finalPath);
 });
 
-app.post('/api/snake-generator/stop', (req, res) => {
-  SnakeAutoGeneratorService.stopGenerator();
-  res.json({ success: true });
-});
-
-app.post('/api/snake-generator/pause', (req, res) => {
-  SnakeAutoGeneratorService.pauseGenerator();
-  res.json({ success: true });
-});
-
-app.post('/api/snake-generator/resume', (req, res) => {
-  SnakeAutoGeneratorService.resumeGenerator();
-  res.json({ success: true });
-});
-
-app.post('/api/snake-generator/settings', async (req, res) => {
-  const GeneratorSettings = require('./models/GeneratorSettings').default;
-  let settings = await GeneratorSettings.findOne();
-  if (!settings) settings = new GeneratorSettings();
-  Object.assign(settings, req.body);
-  await settings.save();
-  res.json({ success: true });
-});
-
-app.get('/api/snake-recordings', async (req, res) => {
+app.get('/api/recordings', (req, res) => {
   try {
-    const recordings = await SnakeRecording.find().sort({ createdAt: -1 });
-    res.json(recordings);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch recordings' });
+    const files = fs.readdirSync(recordingsDir).filter(f => f.endsWith('.mp4')).sort().reverse();
+    res.json(files);
+  } catch (err) {
+    res.json([]);
   }
 });
 
-app.delete('/api/snake-recordings/:id', async (req, res) => {
+app.delete('/api/recordings/:filename', (req, res) => {
   try {
-    const recording = await SnakeRecording.findById(req.params.id);
-    if (!recording) return res.status(404).json({ error: 'Not found' });
-    
-    if (fs.existsSync(recording.filepath)) {
-      fs.unlinkSync(recording.filepath);
+    const filePath = path.join(recordingsDir, req.params.filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'File not found' });
     }
-    await recording.deleteOne();
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete file' });
+  }
+});
+
+app.put('/api/recordings/:filename', (req, res) => {
+  try {
+    const oldPath = path.join(recordingsDir, req.params.filename);
+    let newFilename = req.body.newFilename;
+    
+    if (!newFilename.endsWith('.mp4')) newFilename += '.mp4';
+    
+    const newPath = path.join(recordingsDir, newFilename);
+
+    if (fs.existsSync(oldPath)) {
+      fs.renameSync(oldPath, newPath);
+      res.json({ success: true, newFilename });
+    } else {
+      res.status(404).json({ error: 'File not found' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to rename file' });
   }
 });
 
