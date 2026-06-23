@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
 import { Video } from '../models/Video';
+import fs from 'fs';
+import path from 'path';
+import { getDurationFromVideo } from '../utils/videoUtils';
+import { recordGameplay } from '../services/GameRecorderService';
+import ffmpeg from 'fluent-ffmpeg';
 
 export const uploadLocalVideo = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -10,16 +15,43 @@ export const uploadLocalVideo = async (req: Request, res: Response): Promise<voi
 
     const { title, description } = req.body;
 
-    const video = await Video.create({
-      title: title || req.file.originalname,
-      description,
-      filename: req.file.filename,
-      path: req.file.path,
-      size: req.file.size,
-      sourceType: 'local',
+    ffmpeg.ffprobe(req.file.path, async (err, metadata) => {
+      let width = 1920;
+      let height = 1080;
+      let detectedFormat = 'Full Video';
+
+      if (!err && metadata && metadata.streams) {
+        const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+        if (videoStream && videoStream.width && videoStream.height) {
+          width = videoStream.width;
+          height = videoStream.height;
+          if (height > width) {
+            detectedFormat = 'Shorts';
+          }
+        }
+      }
+
+      const aspectRatio = `${width}:${height}`;
+
+      try {
+        const video = await Video.create({
+          title: title || req.file!.originalname,
+          description,
+          filename: req.file!.filename,
+          path: req.file!.path,
+          size: req.file!.size,
+          sourceType: 'local',
+          width,
+          height,
+          aspectRatio,
+          detectedFormat
+        });
+        res.status(201).json(video);
+      } catch (dbErr: any) {
+        res.status(500).json({ message: dbErr.message });
+      }
     });
 
-    res.status(201).json(video);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -96,5 +128,47 @@ export const deleteVideo = async (req: Request, res: Response): Promise<void> =>
     res.json({ message: 'Video removed' });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateVideo = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { detectedFormat, title } = req.body;
+    const video = await Video.findById(req.params.id);
+    
+    if (!video) {
+      res.status(404).json({ message: 'Video not found' });
+      return;
+    }
+
+    if (detectedFormat && ['Shorts', 'Full Video'].includes(detectedFormat)) {
+      video.detectedFormat = detectedFormat;
+    }
+    
+    if (title && title.trim() !== '') {
+      video.title = title.trim();
+    }
+
+    await video.save();
+    res.json(video);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const recordGame = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { durationSeconds = 30, title } = req.body;
+    
+    // Respond immediately so frontend isn't blocked
+    res.status(202).json({ message: 'Recording started in the background.' });
+    
+    // Run recording in background
+    recordGameplay(durationSeconds, title).catch(err => {
+      console.error('Failed to complete background recording:', err);
+    });
+  } catch (error: any) {
+    // If it fails before even starting
+    console.error('Error starting recording:', error);
   }
 };

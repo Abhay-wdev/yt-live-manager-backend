@@ -46,10 +46,25 @@ export class FFmpegService {
       await activeStream.save();
     }
 
-    this.processPlaylist(items, activeStream, instance, youtubeAccount.streamKey);
+    let masterFormat = 'Full Video';
+    if (instance.streamMode === 'Force Shorts Mode') {
+      masterFormat = 'Shorts';
+    } else if (instance.streamMode === 'Force Full Video Mode') {
+      masterFormat = 'Full Video';
+    } else {
+      let shortsCount = 0;
+      let fullCount = 0;
+      for (const item of items) {
+        if ((item.videoId as any).detectedFormat === 'Shorts') shortsCount++;
+        else fullCount++;
+      }
+      masterFormat = shortsCount > fullCount ? 'Shorts' : 'Full Video';
+    }
+
+    this.processPlaylist(items, activeStream, instance, youtubeAccount.streamKey, masterFormat);
   }
 
-  private async processPlaylist(items: any[], activeStream: any, instance: any, streamKey: string) {
+  private async processPlaylist(items: any[], activeStream: any, instance: any, streamKey: string, masterFormat: string) {
     const streamId = instance._id.toString();
     if (this.intentionalStops.get(streamId)) return;
 
@@ -63,7 +78,7 @@ export class FFmpegService {
       activeStream.playlistIndex = 0;
       activeStream.currentPlaylistLoopCount++;
       await activeStream.save();
-      return this.processPlaylist(items, activeStream, instance, streamKey);
+      return this.processPlaylist(items, activeStream, instance, streamKey, masterFormat);
     }
 
     const currentItem = items[activeStream.playlistIndex];
@@ -83,7 +98,7 @@ export class FFmpegService {
     
     io.emit('stream-status', { streamId, status: 'Live' });
 
-    await this.streamVideoProcess(video, activeStream, instance, streamKey, items);
+    await this.streamVideoProcess(video, activeStream, instance, streamKey, items, masterFormat);
   }
 
   private async resolveGoogleDriveLink(fileId: string): Promise<{ url: string, cookie?: string }> {
@@ -118,7 +133,7 @@ export class FFmpegService {
     }
   }
 
-  private async streamVideoProcess(video: any, activeStream: any, instance: any, streamKey: string, items: any[]) {
+  private async streamVideoProcess(video: any, activeStream: any, instance: any, streamKey: string, items: any[], masterFormat: string) {
     const streamId = instance._id.toString();
     let inputPath = video.path;
     let inputCookie = '';
@@ -130,6 +145,13 @@ export class FFmpegService {
           inputPath = resolved.url;
           if (resolved.cookie) inputCookie = resolved.cookie;
        }
+    }
+
+    let effectiveFormat = masterFormat || 'Full Video';
+
+    let vfFilter = 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2';
+    if (effectiveFormat === 'Shorts') {
+      vfFilter = 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2';
     }
 
     const rtmpUrl = 'rtmp://a.rtmp.youtube.com/live2';
@@ -151,9 +173,9 @@ export class FFmpegService {
       '-r', '30',
       '-g', '60',
       '-keyint_min', '30',
-      '-maxrate', '1000k',
-      '-bufsize', '2000k',
-      '-vf', 'scale=-2:480',
+      '-maxrate', '4000k',
+      '-bufsize', '8000k',
+      '-vf', vfFilter,
       '-pix_fmt', 'yuv420p',
       '-c:a', 'aac',
       '-b:a', '128k',
@@ -236,7 +258,7 @@ export class FFmpegService {
                 currentActive.lastKnownTimestamp = '00:00:00';
               }
               currentActive.save().then(() => {
-                this.processPlaylist(items, currentActive, instance, streamKey);
+                this.processPlaylist(items, currentActive, instance, streamKey, masterFormat);
               });
             }, instance.restartDelaySeconds * 1000);
             return;
@@ -251,7 +273,7 @@ export class FFmpegService {
       currentActive.restartAttemptCount = 0; 
       await currentActive.save();
       
-      this.processPlaylist(items, currentActive, instance, streamKey);
+      this.processPlaylist(items, currentActive, instance, streamKey, masterFormat);
     });
   }
 

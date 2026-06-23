@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>G Records - Studio</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen p-8">
 
@@ -76,14 +77,39 @@
   </div>
 
   <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const isHeadless = urlParams.get('headless') === 'true';
+
+    // Hide controls if headless
+    if (isHeadless) {
+      document.body.style.background = 'black';
+      document.querySelector('header').style.display = 'none';
+      document.querySelectorAll('.bg-slate-800')[1].parentElement.style.display = 'none';
+      document.querySelectorAll('.bg-slate-800')[0].style.border = 'none';
+      document.querySelectorAll('.bg-slate-800')[0].style.padding = '0';
+      document.querySelector('h2').style.display = 'none';
+    }
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
     // Dynamic backend URL
     const backendUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+    const socket = io(backendUrl);
+
+    if (isHeadless) {
+      socket.on('studio_command_broadcast', (cmd) => {
+        if (cmd === 'STOP_RECORDING') {
+          loopCountTarget = 0; // force break loop
+          triggerGameOver();
+        }
+      });
+    }
 
     // --- GAME STATE ---
     let isPlaying = false;
+    let isMonitorMode = false;
+    let frameCount = 0;
     let score = 0;
     let player = { x: 270, y: 850, w: 40, h: 40, speed: 7 };
     let bullets = [];
@@ -235,10 +261,14 @@
     function initGame() {
       // Init audio if needed
       if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        audioDest = audioCtx.createMediaStreamDestination();
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          audioDest = audioCtx.createMediaStreamDestination();
+        } catch (e) {
+          console.warn("AudioContext not supported or failed to initialize", e);
+        }
       }
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
       score = 0;
       document.getElementById('lblScore').innerText = score;
@@ -505,6 +535,19 @@
       }
 
       ctx.restore();
+
+      if (isHeadless && isPlaying) {
+        frameCount++;
+        if (frameCount % 12 === 0) { // ~5 fps for live preview to prevent blocking the recording thread
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const reader = new FileReader();
+              reader.onloadend = () => socket.emit('studio_frame', reader.result);
+              reader.readAsDataURL(blob);
+            }
+          }, 'image/jpeg', 0.3);
+        }
+      }
     }
 
     function loop() {
@@ -535,8 +578,77 @@
       }
     });
 
-    document.getElementById('btnStart').addEventListener('click', () => {
+    document.getElementById('btnStart').addEventListener('click', async () => {
       loopCountTarget = isInfinite ? -1 : parseInt(document.getElementById('inpLoopCount').value || 1);
+      
+      if (!isHeadless) {
+        // Run on server backend instead of client
+        try {
+          const res = await fetch(`${backendUrl}/api/recordings/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ loops: loopCountTarget })
+          });
+          const data = await res.json();
+          if (data.success) {
+            document.getElementById('statusIndicator').innerText = "Monitoring Server";
+            document.getElementById('statusIndicator').className = "bg-blue-900 text-blue-300 px-4 py-2 rounded-full border border-blue-700 font-bold";
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStart').classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('btnStop').disabled = false;
+            document.getElementById('btnStop').classList.remove('opacity-50', 'cursor-not-allowed');
+            isMonitorMode = true;
+            
+            // Listen for incoming frames from server
+            socket.on('studio_broadcast_frame', (frame) => {
+              if (isMonitorMode) {
+                const img = new Image();
+                img.onload = () => {
+                  ctx.clearRect(0, 0, canvas.width, canvas.height);
+                  ctx.drawImage(img, 0, 0);
+                };
+                img.src = frame;
+              }
+            });
+
+            // Listen for server commands
+            socket.on('studio_command_broadcast', (cmd) => {
+              if (isMonitorMode) {
+                if (cmd === 'PROCESSING_START') {
+                  document.getElementById('statusIndicator').innerText = "Server Processing Video...";
+                  document.getElementById('statusIndicator').className = "bg-yellow-900 text-yellow-300 px-4 py-2 rounded-full border border-yellow-700 font-bold";
+                  document.getElementById('uploadProgress').classList.remove('hidden');
+                  document.getElementById('btnStop').disabled = true;
+                  document.getElementById('btnStop').classList.add('opacity-50', 'cursor-not-allowed');
+                } else if (cmd === 'PROCESSING_COMPLETE') {
+                  document.getElementById('uploadProgress').classList.add('hidden');
+                  document.getElementById('statusIndicator').innerText = "Monitoring Server (Ready for next loop)";
+                  loadLibrary(); // Auto-refresh library
+                } else if (cmd === 'ALL_LOOPS_DONE') {
+                  isMonitorMode = false;
+                  socket.off('studio_broadcast_frame');
+                  socket.off('studio_command_broadcast');
+                  document.getElementById('statusIndicator').innerText = "Ready";
+                  document.getElementById('statusIndicator').className = "bg-slate-800 text-slate-300 px-4 py-2 rounded-full border border-slate-700 font-bold";
+                  document.getElementById('btnStart').disabled = false;
+                  document.getElementById('btnStart').classList.remove('opacity-50', 'cursor-not-allowed');
+                  document.getElementById('btnStop').disabled = true;
+                  document.getElementById('btnStop').classList.add('opacity-50', 'cursor-not-allowed');
+                  initGame(); 
+                  draw();
+                }
+              }
+            });
+            
+            alert('Server-side recording started! You are now monitoring the server\'s live game.');
+          }
+        } catch (err) {
+          alert('Failed to start server-side recording.');
+          console.error(err);
+        }
+        return;
+      }
+      
       currentLoop = 0;
       startRun();
     });
@@ -550,13 +662,24 @@
       
       // Capture stream at 60 FPS
       const videoStream = canvas.captureStream(60);
-      const audioStream = audioDest.stream;
       
       // Combine video and audio tracks
-      const combinedStream = new MediaStream([
-        ...videoStream.getVideoTracks(),
-        ...audioStream.getAudioTracks()
-      ]);
+      const tracks = [...videoStream.getVideoTracks()];
+      const audioTrackCount = (audioDest && audioDest.stream) ? audioDest.stream.getAudioTracks().length : 0;
+      if (audioDest && audioDest.stream) {
+        tracks.push(...audioDest.stream.getAudioTracks());
+      }
+      
+      console.log(`Video Tracks Count: ${videoStream.getVideoTracks().length}`);
+      console.log(`Audio Tracks Count: ${audioTrackCount}`);
+      console.log(`Track Ready State: ${videoStream.getVideoTracks()[0]?.readyState}`);
+      
+      if (videoStream.getVideoTracks().length === 0) {
+        console.error("Recording source failed.");
+        return;
+      }
+      
+      const combinedStream = new MediaStream(tracks);
 
       mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
       
@@ -577,29 +700,55 @@
     }
 
     document.getElementById('btnStop').addEventListener('click', () => {
+      if (!isHeadless && isMonitorMode) {
+        // Tell server to stop
+        socket.emit('studio_command', 'STOP_RECORDING');
+        document.getElementById('statusIndicator').innerText = "Stopping Server...";
+        document.getElementById('btnStop').disabled = true;
+        document.getElementById('btnStop').classList.add('opacity-50', 'cursor-not-allowed');
+        return;
+      }
+
       loopCountTarget = 0; // Force break loop
       triggerGameOver();
     });
 
     function triggerGameOver() {
+      console.log('Stop Requested');
       if (!isPlaying) return;
       isPlaying = false;
       cancelAnimationFrame(animationId);
       
+      console.log('Recorder Stopping');
       mediaRecorder.stop();
       isUploading = true;
       document.getElementById('btnStop').disabled = true;
       document.getElementById('btnStop').classList.add('opacity-50', 'cursor-not-allowed');
+      
+      if (isHeadless) socket.emit('studio_command', 'PROCESSING_START');
       
       document.getElementById('statusIndicator').innerText = "Processing Video...";
       document.getElementById('statusIndicator').className = "bg-yellow-900 text-yellow-300 px-4 py-2 rounded-full border border-yellow-700 font-bold";
       document.getElementById('uploadProgress').classList.remove('hidden');
 
       mediaRecorder.onstop = async () => {
+        console.log('Blob Finalized');
+        console.log(`Chunks Recorded: ${recordedChunks.length}`);
+        
         const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        console.log(`Blob Size: ${(blob.size / 1024 / 1024).toFixed(4)} MB`);
+        console.log(`Mime Type: ${blob.type}`);
+        
+        if (blob.size === 0) {
+          console.error("Recording file is empty. MediaRecorder failed.");
+          return;
+        }
+
         const formData = new FormData();
         formData.append('video', blob, 'recording.webm');
         formData.append('score', score);
+        
+        console.log('File Written (in-memory Blob)');
 
         try {
           const res = await fetch(`${backendUrl}/api/recordings/upload`, {
@@ -608,7 +757,11 @@
           });
           
           if(res.ok) {
+            console.log('Database Updated (or File Uploaded Successfully)');
+            console.log('Library Refreshed');
             loadLibrary();
+          } else {
+            console.error(`Upload failed with status: ${res.status}`);
           }
         } catch (e) {
           console.error(e);
@@ -616,15 +769,20 @@
           isUploading = false;
           document.getElementById('uploadProgress').classList.add('hidden');
           
+          if (isHeadless) socket.emit('studio_command', 'PROCESSING_COMPLETE');
+          
           // Check if we should loop again
           if (loopCountTarget === -1 || currentLoop < loopCountTarget) {
             setTimeout(startRun, 1000); // Wait 1s and start next loop
           } else {
+            if (isHeadless) {
+              socket.emit('studio_command', 'ALL_LOOPS_DONE');
+              console.log('RECORDING_COMPLETE'); // Signal to Puppeteer
+            }
             document.getElementById('statusIndicator').innerText = "Ready";
             document.getElementById('statusIndicator').className = "bg-slate-800 text-slate-300 px-4 py-2 rounded-full border border-slate-700 font-bold";
             document.getElementById('btnStart').disabled = false;
             document.getElementById('btnStart').classList.remove('opacity-50', 'cursor-not-allowed');
-            alert('All requested videos have been generated!');
           }
         }
       };
@@ -686,7 +844,26 @@
 
     // Init
     initGame();
-    loadLibrary();
+    if (!isHeadless) {
+      loadLibrary();
+    }
+
+    // Auto-start for headless
+    if (urlParams.get('autoplay') === 'true') {
+      const loops = parseInt(urlParams.get('loops') || '1');
+      if (loops === -1) {
+        isInfinite = true;
+      } else {
+        document.getElementById('inpLoopCount').value = loops;
+      }
+      
+      // Slight delay to ensure everything is ready
+      setTimeout(() => {
+        loopCountTarget = loops;
+        currentLoop = 0;
+        startRun();
+      }, 1000);
+    }
   </script>
 </body>
 </html>

@@ -23,6 +23,18 @@ export const createStreamInstance = async (req: Request, res: Response): Promise
 export const updateStreamInstance = async (req: Request, res: Response): Promise<void> => {
   try {
     const instance = await StreamInstance.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    
+    // Auto-restart stream to apply new settings if it is currently running
+    const state = await StreamState.findOne({ streamInstanceId: req.params.id });
+    if (state && ['Live', 'Starting', 'Restarting'].includes(state.status as string)) {
+      // Stop cleanly and wait
+      await ffmpegService.stopStream(req.params.id, true);
+      // Wait a moment for FFmpeg process to fully terminate before starting again
+      setTimeout(() => {
+        ffmpegService.startStream(req.params.id).catch(e => console.error("Error auto-restarting stream after update:", e));
+      }, 3000);
+    }
+
     res.json(instance);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -100,6 +112,7 @@ export const duplicateStreamInstance = async (req: Request, res: Response): Prom
       maxRestartAttempts: parent.maxRestartAttempts,
       restartDelaySeconds: parent.restartDelaySeconds,
       resumeMode: parent.resumeMode,
+      streamMode: parent.streamMode,
       customSettings: parent.customSettings
     });
     

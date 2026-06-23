@@ -15,6 +15,17 @@ const startServer = async () => {
 
   io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
+    
+    socket.on('studio_frame', (frame) => {
+      // Broadcast the frame to all other connected clients
+      socket.broadcast.emit('studio_broadcast_frame', frame);
+    });
+
+    socket.on('studio_command', (cmd) => {
+      // Broadcast commands between dashboard and headless browser
+      socket.broadcast.emit('studio_command_broadcast', cmd);
+    });
+
     socket.on('disconnect', () => {
       console.log(`Client disconnected: ${socket.id}`);
     });

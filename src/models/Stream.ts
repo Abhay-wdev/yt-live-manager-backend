@@ -7,6 +7,7 @@ const streamInstanceSchema = new mongoose.Schema({
   
   // Encoding settings
   qualityProfile: { type: String, default: '1080p' },
+  streamMode: { type: String, enum: ['Auto Detect', 'Force Shorts Mode', 'Force Full Video Mode'], default: 'Auto Detect' },
   
   // Loop Settings
   videoLoopCount: { type: Number, default: 1 }, // -1 for infinite
