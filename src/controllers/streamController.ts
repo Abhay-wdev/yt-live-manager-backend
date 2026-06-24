@@ -28,10 +28,10 @@ export const updateStreamInstance = async (req: Request, res: Response): Promise
     const state = await StreamState.findOne({ streamInstanceId: req.params.id });
     if (state && ['Live', 'Starting', 'Restarting'].includes(state.status as string)) {
       // Stop cleanly and wait
-      await ffmpegService.stopStream(req.params.id, true);
+      await ffmpegService.stopStream(req.params.id as string, true);
       // Wait a moment for FFmpeg process to fully terminate before starting again
       setTimeout(() => {
-        ffmpegService.startStream(req.params.id).catch(e => console.error("Error auto-restarting stream after update:", e));
+        ffmpegService.startStream(req.params.id as string).catch(e => console.error("Error auto-restarting stream after update:", e));
       }, 3000);
     }
 

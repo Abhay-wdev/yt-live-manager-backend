@@ -1,9 +1,6 @@
 import { Request, Response } from 'express';
 import { Video } from '../models/Video';
 import fs from 'fs';
-import path from 'path';
-import { getDurationFromVideo } from '../utils/videoUtils';
-import { recordGameplay } from '../services/GameRecorderService';
 import ffmpeg from 'fluent-ffmpeg';
 
 export const uploadLocalVideo = async (req: Request, res: Response): Promise<void> => {
@@ -44,7 +41,7 @@ export const uploadLocalVideo = async (req: Request, res: Response): Promise<voi
           width,
           height,
           aspectRatio,
-          detectedFormat
+          detectedFormat: detectedFormat as 'Shorts' | 'Full Video'
         });
         res.status(201).json(video);
       } catch (dbErr: any) {
@@ -156,19 +153,3 @@ export const updateVideo = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-export const recordGame = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { durationSeconds = 30, title } = req.body;
-    
-    // Respond immediately so frontend isn't blocked
-    res.status(202).json({ message: 'Recording started in the background.' });
-    
-    // Run recording in background
-    recordGameplay(durationSeconds, title).catch(err => {
-      console.error('Failed to complete background recording:', err);
-    });
-  } catch (error: any) {
-    // If it fails before even starting
-    console.error('Error starting recording:', error);
-  }
-};

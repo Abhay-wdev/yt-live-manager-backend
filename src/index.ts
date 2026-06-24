@@ -7,6 +7,7 @@ import './models/Stream';
 import './services/ScheduleService'; // Initialize scheduler
 import './services/HealthMonitorService'; // Initialize health monitor
 import { ffmpegService } from './services/FFmpegService';
+import { isRecordingActive, stopNativeRecording } from './services/FFmpegRecorderService';
 
 import ngrok from '@ngrok/ngrok';
 
@@ -16,13 +17,19 @@ const startServer = async () => {
   io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
     
+    if (isRecordingActive) {
+      socket.emit('studio_command', { action: 'PROCESSING_START' });
+    }
+    
     socket.on('studio_frame', (frame) => {
       // Broadcast the frame to all other connected clients
       socket.broadcast.emit('studio_broadcast_frame', frame);
     });
 
     socket.on('studio_command', (cmd) => {
-      // Broadcast commands between dashboard and headless browser
+      if (cmd.action === 'STOP_RECORDING') {
+        stopNativeRecording();
+      }
       socket.broadcast.emit('studio_command_broadcast', cmd);
     });
 

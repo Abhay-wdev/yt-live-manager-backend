@@ -1,5 +1,5 @@
 import express from 'express';
-import { uploadLocalVideo, addGoogleDriveVideo, getVideos, deleteVideo, updateVideo, recordGame } from '../controllers/videoController';
+import { uploadLocalVideo, addGoogleDriveVideo, getVideos, deleteVideo, updateVideo } from '../controllers/videoController';
 import { protect } from '../middlewares/authMiddleware';
 import { upload } from '../middlewares/uploadMiddleware';
 import fs from 'fs';
@@ -11,7 +11,7 @@ if (!fs.existsSync(uploadDir)) {
 
 const router = express.Router();
 
-router.post('/record-game', protect, recordGame);
+
 router.post('/local', protect, upload.single('video'), uploadLocalVideo);
 router.post('/drive', protect, addGoogleDriveVideo);
 router.get('/', protect, getVideos);

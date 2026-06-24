@@ -89,7 +89,7 @@ export class FFmpegService {
       activeStream.currentVideoLoopCount = 0;
       activeStream.lastKnownTimestamp = '00:00:00';
       await activeStream.save();
-      return this.processPlaylist(items, activeStream, instance, streamKey);
+      return this.processPlaylist(items, activeStream, instance, streamKey, masterFormat);
     }
 
     activeStream.currentVideoId = video._id;
