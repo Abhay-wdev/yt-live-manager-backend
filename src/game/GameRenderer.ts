@@ -1,11 +1,26 @@
-import { CanvasRenderingContext2D, Image, loadImage, Canvas, createCanvas } from 'canvas';
+let CanvasRenderingContext2D: any, Image: any, loadImage: any, Canvas: any, createCanvas: any;
+let isCanvasSupported = false;
+try {
+  const canvasModule = require('canvas');
+  CanvasRenderingContext2D = canvasModule.CanvasRenderingContext2D;
+  Image = canvasModule.Image;
+  loadImage = canvasModule.loadImage;
+  Canvas = canvasModule.Canvas;
+  createCanvas = canvasModule.createCanvas;
+  isCanvasSupported = true;
+} catch (e) {
+  console.warn("Canvas module not found. Server-side rendering disabled.");
+}
+
 import { GameState } from './GameEngine';
 import path from 'path';
 
 export class GameRenderer {
-  public static imageCache: Record<string, Canvas> = {};
+  public static imageCache: Record<string, any> = {};
+  public static get isSupported() { return isCanvasSupported; }
 
   public static async loadAssets() {
+    if (!isCanvasSupported) return;
     const assets = ['rocket', 'scout-ship', 'alien-stare', 'alien-skull', 'glider', 'drill', 'grease-trap'];
     for (const name of assets) {
       if (!this.imageCache[name]) {
@@ -17,11 +32,11 @@ export class GameRenderer {
       }
     }
   }
-  private ctx: CanvasRenderingContext2D;
+  private ctx: any;
   private width: number;
   private height: number;
 
-  constructor(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  constructor(ctx: any, width: number, height: number) {
     this.ctx = ctx;
     this.width = width;
     this.height = height;

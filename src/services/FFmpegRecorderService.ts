@@ -1,7 +1,6 @@
 import { spawn } from 'child_process';
 import { GameEngine } from '../game/GameEngine';
 import { GameRenderer } from '../game/GameRenderer';
-import { createCanvas } from 'canvas';
 import path from 'path';
 import fs from 'fs';
 import socketService from './socketService';
@@ -23,6 +22,13 @@ export const stopNativeRecording = () => {
 
 export const startNativeRecording = async (loops: number) => {
   if (isRecordingActive) return;
+
+  if (!GameRenderer.isSupported) {
+    console.warn("Canvas is not installed. Native recording is disabled.");
+    socketService.getIO().emit('studio_command', { action: 'PROCESSING_COMPLETE', filename: null, score: 0, error: 'CANVAS_NOT_INSTALLED' });
+    return;
+  }
+
   isRecordingActive = true;
   console.log(`Starting Native Node.js Recording for ${loops} loops`);
   await GameRenderer.loadAssets();
@@ -31,7 +37,8 @@ export const startNativeRecording = async (loops: number) => {
   const height = 960;
   const fps = 60;
   
-  const canvas = createCanvas(width, height);
+  const canvasModule = require('canvas');
+  const canvas = canvasModule.createCanvas(width, height);
   const ctx = canvas.getContext('2d');
   
   const game = new GameEngine(true);
