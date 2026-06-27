@@ -16,6 +16,7 @@ interface StreamInstance {
 
 class ImageStreamService {
   private activeStreams: Map<string, StreamInstance> = new Map();
+  private restartTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   async initialize() {
     console.log('Initializing ImageStreamService... marking all previously Live streams as Stopped.');
@@ -121,11 +122,15 @@ class ImageStreamService {
           whatsappService.sendStreamCrashedAlert(account.name, image.name, code);
         }
 
-        setTimeout(() => {
-          if (!this.activeStreams.has(streamId)) {
+        const timeoutId = setTimeout(async () => {
+          this.restartTimeouts.delete(streamId);
+          // Check DB to make sure user didn't click stop during the 5s window
+          const currentConfig = await ImageStreamConfig.findOne({ streamId });
+          if (!this.activeStreams.has(streamId) && currentConfig?.status === 'Restarting') {
             this.startStream(streamId, imageId, youtubeAccountId, imagePath, streamKey, resolution, fps).catch(e => console.error('Restart failed', e));
           }
         }, 5000);
+        this.restartTimeouts.set(streamId, timeoutId);
       } else {
         await ImageStreamConfig.findOneAndUpdate({ streamId }, { status: 'Stopped' });
         io.emit('image-stream-status', { streamId, status: 'Offline' });
@@ -135,6 +140,13 @@ class ImageStreamService {
 
   async stopStream(streamId: string) {
     const instance = this.activeStreams.get(streamId);
+    
+    // Clear any pending restart timeouts to prevent infinite loops
+    const pendingTimeout = this.restartTimeouts.get(streamId);
+    if (pendingTimeout) {
+      clearTimeout(pendingTimeout);
+      this.restartTimeouts.delete(streamId);
+    }
     
     // Update DB even if process isn't running (it might be scheduled)
     await ImageStreamConfig.findOneAndUpdate({ streamId }, { status: 'Stopped', isScheduled: false });
