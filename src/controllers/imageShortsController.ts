@@ -155,3 +155,63 @@ export const getImageStreamStatus = async (req: Request, res: Response): Promise
     res.status(500).json({ message: error.message });
   }
 };
+
+export const deleteStreamConfig = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { streamId } = req.params;
+    if (!streamId) {
+      res.status(400).json({ message: 'streamId is required' });
+      return;
+    }
+    
+    // Stop stream if it is running
+    await imageStreamService.stopStream(streamId);
+    
+    // Delete from DB
+    const ImageStreamConfig = require('../models/ImageStreamConfig').default;
+    await ImageStreamConfig.findOneAndDelete({ streamId });
+    
+    res.json({ message: 'Stream configuration deleted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateStreamConfig = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { streamId } = req.params;
+    const { resolution, fps, isScheduled, scheduleType, startTime, stopTime, dailyStartTime, dailyStopTime } = req.body;
+    
+    if (!streamId) {
+      res.status(400).json({ message: 'streamId is required' });
+      return;
+    }
+    
+    const ImageStreamConfig = require('../models/ImageStreamConfig').default;
+    
+    const configData: any = {};
+    if (resolution) configData.resolution = resolution;
+    if (fps) configData.fps = fps;
+    if (isScheduled !== undefined) configData.isScheduled = isScheduled;
+    if (scheduleType) configData.scheduleType = scheduleType;
+    if (startTime !== undefined) configData.startTime = startTime;
+    if (stopTime !== undefined) configData.stopTime = stopTime;
+    if (dailyStartTime !== undefined) configData.dailyStartTime = dailyStartTime;
+    if (dailyStopTime !== undefined) configData.dailyStopTime = dailyStopTime;
+
+    const config = await ImageStreamConfig.findOneAndUpdate(
+      { streamId },
+      { $set: configData },
+      { new: true }
+    );
+    
+    if (!config) {
+      res.status(404).json({ message: 'Stream config not found' });
+      return;
+    }
+    
+    res.json({ message: 'Stream configuration updated successfully', config });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
