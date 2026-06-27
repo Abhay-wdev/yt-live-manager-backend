@@ -78,7 +78,7 @@ export const deleteImage = async (req: Request, res: Response): Promise<void> =>
 
 export const startImageStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { imageId, youtubeAccountId, resolution = '1080p', fps = '30' } = req.body;
+    const { imageId, youtubeAccountId, resolution = '1080p', fps = '30', isScheduled, scheduleType, startTime, stopTime, dailyStartTime, dailyStopTime } = req.body;
 
     if (!imageId || !youtubeAccountId) {
       res.status(400).json({ message: 'imageId and youtubeAccountId are required' });
@@ -98,8 +98,36 @@ export const startImageStream = async (req: Request, res: Response): Promise<voi
     }
 
     const streamId = `${youtubeAccountId}_${imageId}`;
-    await imageStreamService.startStream(streamId, image._id.toString(), account._id.toString(), image.path, account.streamKey, resolution, fps);
-    res.json({ message: 'Stream started', streamId });
+    
+    if (isScheduled) {
+      const ImageStreamConfig = require('../models/ImageStreamConfig').default;
+      let config = await ImageStreamConfig.findOne({ streamId });
+      
+      const configData = {
+        streamId,
+        youtubeAccountId,
+        imageId,
+        resolution,
+        fps,
+        status: 'Stopped',
+        isScheduled,
+        scheduleType,
+        startTime: startTime ? new Date(startTime) : undefined,
+        stopTime: stopTime ? new Date(stopTime) : undefined,
+        dailyStartTime,
+        dailyStopTime
+      };
+
+      if (!config) {
+        await ImageStreamConfig.create(configData);
+      } else {
+        await ImageStreamConfig.findOneAndUpdate({ streamId }, configData);
+      }
+      res.json({ message: 'Stream scheduled', streamId });
+    } else {
+      await imageStreamService.startStream(streamId, image._id.toString(), account._id.toString(), image.path, account.streamKey, resolution, fps);
+      res.json({ message: 'Stream started', streamId });
+    }
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -121,7 +149,7 @@ export const stopImageStream = async (req: Request, res: Response): Promise<void
 
 export const getImageStreamStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    const activeStreams = imageStreamService.getActiveStreams();
+    const activeStreams = await imageStreamService.getActiveStreams();
     res.json({ activeStreams });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

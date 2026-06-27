@@ -6,8 +6,10 @@ import './models/Playlist';
 import './models/Stream';
 import './services/ScheduleService'; // Initialize scheduler
 import './services/HealthMonitorService'; // Initialize health monitor
+import './services/StreamScheduler'; // Initialize stream scheduler
 import { ffmpegService } from './services/FFmpegService';
 import { isRecordingActive, stopNativeRecording } from './services/FFmpegRecorderService';
+import { imageStreamService } from './services/ImageStreamService';
 
 import ngrok from '@ngrok/ngrok';
 
@@ -42,6 +44,7 @@ const startServer = async () => {
     console.log(`Server running on port ${config.port}`);
     // Recover state if server crashed
     ffmpegService.resumeStateOnBoot();
+    await imageStreamService.initialize();
     
     try {
       const authtoken = process.env.NGROK_AUTHTOKEN;
