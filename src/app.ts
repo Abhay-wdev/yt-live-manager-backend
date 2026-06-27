@@ -43,6 +43,7 @@ import videoRoutes from './routes/videoRoutes';
 import playlistRoutes from './routes/playlistRoutes';
 import streamRoutes from './routes/streamRoutes';
 import scheduleRoutes from './routes/scheduleRoutes';
+import imageShortsRoutes from './routes/imageShortsRoutes';
 import youtubeAccountRoutes from './routes/youtubeAccountRoutes';
 
 app.use('/api/auth', authRoutes);
@@ -50,6 +51,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/stream', streamRoutes);
+app.use('/api/image-shorts', imageShortsRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/youtube-accounts', youtubeAccountRoutes);
 
