@@ -62,6 +62,7 @@ class ImageStreamService {
 
     const ffmpegArgs = [
       '-re',
+      '-framerate', fps,
       '-loop', '1',
       '-i', imagePath,
       '-f', 'lavfi',
@@ -72,8 +73,11 @@ class ImageStreamService {
       '-r', fps,
       '-g', gop,
       '-keyint_min', fps,
+      '-b:v', maxrate,
       '-maxrate', maxrate,
+      '-minrate', maxrate,
       '-bufsize', bufsize,
+      '-x264-params', 'nal-hrd=cbr',
       '-vf', `scale=${scale}:force_original_aspect_ratio=decrease,pad=${scale}:(ow-iw)/2:(oh-ih)/2`,
       '-pix_fmt', 'yuv420p',
       '-c:a', 'aac',
