@@ -27,7 +27,7 @@ class ImageStreamService {
     );
   }
 
-  async startStream(streamId: string, imageId: string, youtubeAccountId: string, imagePath: string, streamKey: string, resolution: string = '1080p', fps: string = '30') {
+  async startStream(streamId: string, imageId: string, youtubeAccountId: string, imagePath: string, streamKey: string, resolution: string = '1080p', fps: string = '30', deviceName: string = 'Unknown Device') {
     if (this.activeStreams.has(streamId)) {
       throw new Error('This specific image stream is already running on this channel.');
     }
@@ -41,12 +41,16 @@ class ImageStreamService {
         imageId,
         resolution,
         fps,
-        status: 'Live'
+        status: 'Live',
+        deviceName
       });
     } else {
       config.status = 'Live';
       config.resolution = resolution;
       config.fps = Number(fps);
+      if (deviceName !== 'Unknown Device') {
+        config.deviceName = deviceName;
+      }
       await config.save();
     }
 
@@ -62,7 +66,7 @@ class ImageStreamService {
 
     const ffmpegArgs = [
       '-re',
-      '-framerate', fps,
+      '-framerate', '1',
       '-loop', '1',
       '-i', imagePath,
       '-f', 'lavfi',
@@ -131,7 +135,7 @@ class ImageStreamService {
           // Check DB to make sure user didn't click stop during the 5s window
           const currentConfig = await ImageStreamConfig.findOne({ streamId });
           if (!this.activeStreams.has(streamId) && currentConfig?.status === 'Restarting') {
-            this.startStream(streamId, imageId, youtubeAccountId, imagePath, streamKey, resolution, fps).catch(e => console.error('Restart failed', e));
+            this.startStream(streamId, imageId, youtubeAccountId, imagePath, streamKey, resolution, fps, currentConfig.deviceName).catch(e => console.error('Restart failed', e));
           }
         }, 5000);
         this.restartTimeouts.set(streamId, timeoutId);

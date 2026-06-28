@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import UAParser from 'ua-parser-js';
 import { ffmpegService } from '../services/FFmpegService';
 import { StreamInstance, StreamState } from '../models/Stream';
 
@@ -13,7 +14,16 @@ export const getStreamInstances = async (req: Request, res: Response): Promise<v
 
 export const createStreamInstance = async (req: Request, res: Response): Promise<void> => {
   try {
-    const instance = await StreamInstance.create(req.body);
+    const parser = new UAParser(req.headers['user-agent']);
+    const result = parser.getResult();
+    const os = result.os.name || 'Unknown OS';
+    let deviceName = `${os} - ${result.browser.name || 'Unknown Browser'}`;
+    if (result.device.vendor || result.device.model) {
+      deviceName = `${result.device.vendor || ''} ${result.device.model || ''} (${os})`.trim();
+    }
+
+    const payload = { ...req.body, deviceName };
+    const instance = await StreamInstance.create(payload);
     res.status(201).json(instance);
   } catch (error: any) {
     res.status(500).json({ message: error.message });

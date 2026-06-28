@@ -7,6 +7,7 @@ export interface IImageStreamConfig extends Document {
   resolution: string;
   fps: number;
   status: 'Live' | 'Stopped' | 'Restarting' | 'Failed';
+  deviceName: string;
   
   // Scheduling
   isScheduled: boolean;
@@ -32,6 +33,7 @@ const ImageStreamConfigSchema: Schema = new Schema(
     resolution: { type: String, required: true, default: '1080p' },
     fps: { type: Number, required: true, default: 30 },
     status: { type: String, required: true, enum: ['Live', 'Stopped', 'Restarting', 'Failed'], default: 'Stopped' },
+    deviceName: { type: String, default: 'Unknown Device' },
     
     isScheduled: { type: Boolean, default: false },
     scheduleType: { type: String, enum: ['One-Time', 'Recurring'] },

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import UAParser from 'ua-parser-js';
 import { ImageAsset } from '../models/ImageAsset';
 import { YoutubeAccount } from '../models/YoutubeAccount';
 import { imageStreamService } from '../services/ImageStreamService';
@@ -99,6 +100,14 @@ export const startImageStream = async (req: Request, res: Response): Promise<voi
 
     const streamId = `${youtubeAccountId}_${imageId}`;
     
+    const parser = new UAParser(req.headers['user-agent']);
+    const result = parser.getResult();
+    const os = result.os.name || 'Unknown OS';
+    let deviceName = `${os} - ${result.browser.name || 'Unknown Browser'}`;
+    if (result.device.vendor || result.device.model) {
+      deviceName = `${result.device.vendor || ''} ${result.device.model || ''} (${os})`.trim();
+    }
+    
     if (isScheduled) {
       const ImageStreamConfig = require('../models/ImageStreamConfig').default;
       let config = await ImageStreamConfig.findOne({ streamId });
@@ -115,7 +124,8 @@ export const startImageStream = async (req: Request, res: Response): Promise<voi
         startTime: startTime ? new Date(startTime) : undefined,
         stopTime: stopTime ? new Date(stopTime) : undefined,
         dailyStartTime,
-        dailyStopTime
+        dailyStopTime,
+        deviceName
       };
 
       if (!config) {
@@ -125,7 +135,7 @@ export const startImageStream = async (req: Request, res: Response): Promise<voi
       }
       res.json({ message: 'Stream scheduled', streamId });
     } else {
-      await imageStreamService.startStream(streamId, image._id.toString(), account._id.toString(), image.path, account.streamKey, resolution, fps);
+      await imageStreamService.startStream(streamId, image._id.toString(), account._id.toString(), image.path, account.streamKey, resolution, fps, deviceName);
       res.json({ message: 'Stream started', streamId });
     }
   } catch (error: any) {

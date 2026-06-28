@@ -4,6 +4,7 @@ const streamInstanceSchema = new mongoose.Schema({
   name: { type: String, required: true },
   youtubeAccountId: { type: mongoose.Schema.Types.ObjectId, ref: 'YoutubeAccount', required: true },
   playlistId: { type: mongoose.Schema.Types.ObjectId, ref: 'Playlist', required: true },
+  deviceName: { type: String, default: 'Unknown Device' },
   
   // Encoding settings
   qualityProfile: { type: String, default: '1080p' },
